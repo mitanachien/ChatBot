@@ -65,7 +65,7 @@ clean_answers = []
 for answer in answers:
     clean_answers.append(clean_text(answer))
     
-# Creating a dictionary that maps each word to its number of occuerences
+# Creating a dictionary that maps each word to its number of occurrences
 # To remove less than 5% frequent words
 word2count = {}
 for question in clean_questions:
@@ -98,4 +98,60 @@ for word, count in word2count.items():
         word_number += 1
 
 # Adding the last tokens to these two dictionaries
-tokens = ['<PAD>', ]
+tokens = ['<PAD>', '<EOS>', '<OUT>', '<SOS>']
+for token in tokens:
+    questionswords2int[token] = len(questionswords2int) + 1
+for token in tokens:
+    answerswords2int[token] = len(answerswords2int) + 1
+
+# Creating the inverse dictionary of the answersword2int dictionary
+answersint2word = {w_i : w for w, w_i in answerswords2int.items()}
+
+# Adding the End of String token to the end of every answer
+for i in range(len(clean_answers)):
+    clean_answers[i] += ' <EOS>'
+    
+# Translating all the questions and the answers into integers
+# and Replacing all the words that were filtered out by <OUT>
+questions_to_int = []
+for question in clean_questions:
+    ints = []
+    for word in question.split():
+        if word in questionswords2int:
+            ints.append(questionswords2int[word])
+        else:
+            ints.append(questionswords2int['<OUT>'])
+    questions_to_int.append(ints)
+answers_to_int = []
+for answer in clean_answers:
+    ints = []
+    for word in answer.split():
+        if word in answerswords2int:
+            ints.append(answerswords2int[word])
+        else:
+            ints.append(answerswords2int['<OUT>'])
+    answers_to_int.append(ints)
+
+# Sorting questions and answers by the length of questions
+# To optimize and speed up training
+sorted_clean_questions = []
+sorted_clean_answers = []
+# Set the length of each sentance (hyperparameter to tune)
+for length in range(1, 25 + 1):
+    for i in enumerate(questions_to_int):
+        if len(i[1]) == length:
+            sorted_clean_questions.append(questions_to_int[i[0]])
+            sorted_clean_answers.append(answers_to_int[i[0]])
+            
+###### Building The Seq2Seq Model ######
+            
+# Creating placeholders for the inputs and the targets
+def model_inputs():
+    inputs = tf.placeholder(tf.int32, [None, None], name = 'input')  # 2-dimentional int matrix
+    targets = tf.placeholder(tf.int32, [None, None], name = 'target')
+    lr = tf.placeholder(tf.float32, name = 'learning_rate')
+    keep_prob = tf.placeholder(tf.float32, name = 'keep_prob') # To control the drop-out rate
+    
+    return inputs, targets, lr, keep_prob
+
+# Preprocessing the targets
