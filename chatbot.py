@@ -334,13 +334,39 @@ training_predictions, test_predictions = seq2seq_model(tf.reverse(inputs, [-1]),
                                                                   questionswords2int)
 
 # Setting up the Loss Error, the Optimizer and Gradient Clipping
+with tf.name_scope("optimization"):
+    loss_error = tf.contrib.seq2seq.sequence_loss(training_predictions,
+                                                  targets,
+                                                  tf.ones([input_shape[0], sequence_length]))
+    optimizer = tf.train.AdamOptimizer(learning_rate)
+    gradients = optimizer.compute_gradients(loss_error)
+    # To clip tensor values to a specified min and max
+    clipped_gradients = [(tf.clip_by_value(grad_tensor, -5., 5.), grad_variable) for grad_tensor, grad_variable in gradients if grad_tensor is not None]
+    optimizer_gradient_clipping = optimizer.apply_gradients(clipped_gradients)
 
+# Padding the sequences with the <PAD> tooken
+# All the sentnences in a batch need to have the same length
+def apply_padding(batch_of_sequences, word2int):
+    max_sequence_length = max([len(sequence) for sequence in batch_of_sequences])
+    
+    return [sequence + [word2int['<PAD>']] * (max_sequence_length - len(sequence)) for sequence in batch_of_sequences]
 
+# Splitting the data into batches of questions and answers
+def split_into_batches(questions, answers, batch_size):
+    for batch_index in range(0, len(questions) // batch_size):
+        start_index = batch_index * batch_size
+        questions_in_batch = questions[start_index : start_index + batch_size]
+        answers_in_batch = answers[start_index : start_index + batch_size]
+        padded_questions_in_batch = np.array(apply_padding(questions_in_batch, questionswords2int))
+        padded_answers_in_batch = np.array(apply_padding(answers_in_batch, answerswords2int))
+        yield padded_questions_in_batch, padded_answers_in_batch
 
-
-
-
-
+# Splitting the questions and answers into training and validation sets
+training_validation_split = int(len(sorted_clean_questions) * 0.15)
+training_questions = sorted_clean_questions[training_validation_split:]
+training_answers = sorted_clean_answers[training_validation_split:]
+validation_questions = sorted_clean_questions[:training_validation_split]
+validation_answers = sorted_clean_answers[:training_validation_split]
 
 
 
