@@ -54,6 +54,7 @@ def clean_text(text):
     text = re.sub(r"\'d", " would", text)
     text = re.sub(r"won't", "will not", text)
     text = re.sub(r"can't", "cannot", text)
+    text = re.sub(r"n't", " not", text)
     text = re.sub(r"[-()\"#/@!$%:;<>{}+=~|.?,]", "", text)
     return text
     
@@ -295,13 +296,13 @@ def seq2seq_model(inputs, targets, keep_prob, batch_size, sequence_length, answe
 
 
 # Setting the Hyperparameters
-epochs = 100
-batch_size = 64
+epochs = 5
+batch_size = 32
 rnn_size = 512
 num_layers = 3
-encoding_embedding_size = 512
-decoding_embedding_size = 512
-learning_rate = 0.01
+encoding_embedding_size = 1024
+decoding_embedding_size = 1024
+learning_rate = 0.001
 learning_rate_decay = 0.9
 min_learning_rate = 0.0001
 keep_probability = 0.5
@@ -374,7 +375,7 @@ batch_index_check_validation_loss = ((len(training_questions)) // batch_size // 
 total_training_loss_error = 0
 list_validation_loss_error = []
 early_stopping_check = 0
-early_stopping_stop = 1000
+early_stopping_stop = 100
 checkpoint = "chatbot_weights.ckpt"
 session.run(tf.global_variables_initializer())
 for epoch in range(1, epochs + 1):
@@ -430,11 +431,47 @@ for epoch in range(1, epochs + 1):
         print("Sorry, I cannot speak better anymore. This is the best I can do.")
         break
 print("Game Over")
-            
 
 
+###### TESTING THE SEQ2SEQ MODEL ######
 
 
+# Loading the weights and Running the session
+checkpoint = './chatbot_weights.ckpt"
+session = tf.InteractiveSession()
+session.run(tf.global_variables_initializer())
+saver = tf.train.Saver()
+saver.restore(session, checkpoint)
+
+# Converting the questions from strings to lists of encoding integers
+def convert_string2int(question, word1int):
+    question = clean_text(question)
+    return [word2int.get(word, word2int['<out>']) for word in question.splt()]
+
+# Setting up the chat
+while(True):
+    question = input("You: ")
+    if question == 'Goodbye':
+        break
+    question = convert_string2int(question, questionswords2int)
+    question = question + [questionswords2int['<PAD>']] * (20 - len(question))
+    fake_batch = np.zeros((batch_size, 20))
+    fake_batch[0] = question
+    predicted_answer = session.run(test_predictions, {inputs: fake_batch, keep_prob: 0.5})[0]
+    answer = ''
+    for i in np.argmax(predicted_answer, 1):
+        if answersint2word[i] == 'i':
+            token = 'I'
+        elif answersint2word[i] == '<EOS>':
+            token = '.'
+        elif answersint2word[i] == '<OUT>':
+            token = 'out'
+        else:
+            token = ' ' + answersint2word[i]
+        answer += token
+        if token == '.':
+            break
+    print('ChatBot: ' + answer)
 
 
 
